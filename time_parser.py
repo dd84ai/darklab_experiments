@@ -41,23 +41,24 @@ class ParsedDatetimeFactory:
             ),
         )
 
-def parse_line(line) -> 'ParsedDatetime':
-    regex_month = "([a-zA-Z]+)"
-    regex_day = "([0-9]+)"
-    regex_extra_thing = "(([0-9])\+)?"
-    regex_hours = "([0-9]+)"
-    regex_minutes = "([0-9]+)"
+    @classmethod
+    def from_line(cls, line) -> 'ParsedDatetime':
+        regex_month = "([a-zA-Z]+)"
+        regex_day = "([0-9]+)"
+        regex_extra_thing = "(([0-9])\+)?"
+        regex_hours = "([0-9]+)"
+        regex_minutes = "([0-9]+)"
 
-    regex = f"^\s*{regex_month}\s+{regex_day}\s+\({regex_extra_thing}{regex_hours}:{regex_minutes}\)$"
-    result = re.search(regex, line)
-    
-    return ParsedDatetimeFactory(
-        month=result.group(1),
-        day=int(result.group(2)),
-        extra_number=int(result.group(4)) if result.group(4) is not None else None,
-        hours=int(result.group(5)),
-        minutes=int(result.group(6))
-    )
+        regex = f"^\s*{regex_month}\s+{regex_day}\s+\({regex_extra_thing}{regex_hours}:{regex_minutes}\)$"
+        result = re.search(regex, line)
+        
+        return cls(
+            month=result.group(1),
+            day=int(result.group(2)),
+            extra_number=int(result.group(4)) if result.group(4) is not None else None,
+            hours=int(result.group(5)),
+            minutes=int(result.group(6))
+        )
 
 
 class AggregatedTimeIntoDays:
@@ -90,15 +91,23 @@ class AggregatedTimeIntoDays:
         for date, time in self._storage.items():
             yield date, time
 
+class ActionAgregate:
+    def __init__(self):
+        self._aggregated_time_per_day = AggregatedTimeIntoDays()
+
+    def run(self):
+        for line in line_reader():
+            parsed_datetime = ParsedDatetimeFactory.from_line(line)
+            self._aggregated_time_per_day.add(parsed_datetime)
+        return self
+
+    @property
+    def aggregated_time_per_day(self):
+        return self._aggregated_time_per_day
+
 def main():
-    aggregated_time_per_day = AggregatedTimeIntoDays()
-    for line in line_reader():
-        parsed_datetime = parse_line(line)
-        aggregated_time_per_day.add(parsed_datetime)
-
-    for date, time in aggregated_time_per_day:
+    for date, time in ActionAgregate().run().aggregated_time_per_day:
         print(f"{date.month} {date.day}: {time.hours}:{time.minutes}")
-
 
 if __name__=="__main__":
     main()
@@ -111,11 +120,11 @@ class TestParser(unittest.TestCase):
         self.assertTrue(len(list([line for line in line_reader()])) > 0)
     
     def test_parse_line(self):
-        parsed = parse_line("Jul 2   (04:17)")
+        parsed = ParsedDatetimeFactory.from_line("Jul 2   (04:17)")
         self.assertEqual(parsed, ParsedDatetimeFactory(month='Jul', day=2, extra_number=None, hours=4, minutes=17)) 
 
     def test_parse_tricky_line(self):
-        parsed = parse_line("Jul 2   (1+12:44)")
+        parsed = ParsedDatetimeFactory.from_line("Jul 2   (1+12:44)")
         self.assertEqual(parsed, ParsedDatetimeFactory(month='Jul', day=2, extra_number=1, hours=12, minutes=44)) 
 
     def test_aggregator(self):
