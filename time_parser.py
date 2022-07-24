@@ -35,9 +35,6 @@ def parse_line(line) -> 'ParsedDatetime':
         minutes=int(result.group(6)),
     )
 
-def get_key(parsed_datetime: ParsedDatetime):
-    return f"{parsed_datetime.month} {parsed_datetime.day}"
-
 @dataclass(frozen=True)
 class Time:
     hours: int
