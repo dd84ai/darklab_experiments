@@ -38,8 +38,11 @@ class Timedelta:
         self._data += other._data
         return self
 
+    def __eq__(self, other):
+        return (self.hours, self.minutes) == (other.hours, other.minutes)
+
     def __repr__(self):
-        return f"Timedelta(hours={self.hours}, minutes={self.minutes}"
+        return f"{self.__class__.__name__}(hours={self.hours}, minutes={self.minutes}"
     
 
 @dataclass(frozen=True)
@@ -48,7 +51,7 @@ class TimedeltaAtDate:
     timedelta: Timedelta
 
     def __repr__(self):
-        return f"TimedeltaAtDate({repr(self.date)}, {repr(self.timedelta)})"
+        return f"{self.__class__.__name__}({repr(self.date)}, {repr(self.timedelta)})"
 
 class TimedeltaAtDateFactory:
     def __new__(cls, line) -> TimedeltaAtDate:
