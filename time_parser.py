@@ -40,6 +40,9 @@ class Timedelta:
 
     def __eq__(self, other):
         return (self.hours, self.minutes) == (other.hours, other.minutes)
+
+    def __repr__(self):
+        return f"Timedelta(hours={self.hours}, minutes={self.minutes}"
     
 
 @dataclass(frozen=True)
@@ -47,31 +50,11 @@ class ParsedDatetime:
     date: Date
     time: Timedelta
 
+    def __repr__(self):
+        return f"ParsedDatetime({repr(self.date)}, {repr(self.time)})"
+
 class ParsedDatetimeFactory:
-    def __new__(cls, *args, **kwargs: dict) -> ParsedDatetime:
-        is_source_dict = True if len(args) == 0 else False
-
-        month=kwargs["month"] if is_source_dict else args[0]
-        day=kwargs["day"] if is_source_dict else args[1]
-
-        extra_hours = kwargs["extra_number"] if is_source_dict else args[2]
-        hours = kwargs["hours"] if is_source_dict else args[3]
-        
-        minutes = kwargs["minutes"] if is_source_dict else args[4]
-        return ParsedDatetime(
-            date=Date(
-                month=month,
-                day=day,
-            ),
-            time=Timedelta(
-                hours=hours,
-                minutes=minutes,
-                extra_hours=extra_hours,
-            ),
-        )
-
-    @classmethod
-    def from_line(cls, line) -> 'ParsedDatetime':
+    def __new__(cls, line) -> ParsedDatetime:
         regex_month = "([a-zA-Z]+)"
         regex_day = "([0-9]+)"
         regex_extra_thing = "(([0-9])\+)?"
@@ -80,16 +63,18 @@ class ParsedDatetimeFactory:
 
         regex = f"^\s*{regex_month}\s+{regex_day}\s+\({regex_extra_thing}{regex_hours}:{regex_minutes}\)$"
         result = re.search(regex, line)
-        
-        return cls(
-            month=result.group(1),
-            day=int(result.group(2)),
-            extra_number=int(result.group(4)) if result.group(4) is not None else None,
-            hours=int(result.group(5)),
-            minutes=int(result.group(6))
-        )
 
-import datetime
+        return ParsedDatetime(
+            date=Date(
+                month=result.group(1),
+                day=int(result.group(2)),
+            ),
+            time=Timedelta(
+                hours=int(result.group(5)),
+                minutes=int(result.group(6)),
+                extra_hours=int(result.group(4)) if result.group(4) is not None else None,
+            ),
+        )
 
 class AggregatedTimeIntoDays:
     def __init__(self):
@@ -121,7 +106,7 @@ class ActionAgregate:
 
     def run(self):
         for line in line_reader():
-            parsed_datetime = ParsedDatetimeFactory.from_line(line)
+            parsed_datetime = ParsedDatetimeFactory(line)
             self._aggregated_time_per_day.add(parsed_datetime)
         return self
 
@@ -144,24 +129,24 @@ class TestParser(unittest.TestCase):
         self.assertTrue(len(list([line for line in line_reader()])) > 0)
     
     def test_parse_line(self):
-        parsed = ParsedDatetimeFactory.from_line("Jul 2   (04:17)")
-        self.assertEqual(parsed, ParsedDatetimeFactory(month='Jul', day=2, extra_number=None, hours=4, minutes=17)) 
+        parsed = ParsedDatetimeFactory("Jul 2   (04:17)")
+        self.assertEqual(repr(parsed), "ParsedDatetime(Date(month='Jul', day=2), Timedelta(hours=4, minutes=17)") 
 
     def test_parse_tricky_line(self):
-        parsed = ParsedDatetimeFactory.from_line("Jul 2   (1+12:44)")
-        self.assertEqual(parsed, ParsedDatetimeFactory(month='Jul', day=2, extra_number=1, hours=12, minutes=44)) 
+        parsed = ParsedDatetimeFactory("Jul 2   (1+12:44)")
+        self.assertEqual(repr(parsed), "ParsedDatetime(Date(month='Jul', day=2), Timedelta(hours=36, minutes=44)") 
 
     def test_aggregator(self):
         aggregated_time_per_day = AggregatedTimeIntoDays()
-        aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, None, 22, 50))
-        aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, None, 22, 50))
+        aggregated_time_per_day.add(ParsedDatetimeFactory("Jul 2   (22:50)"))
+        aggregated_time_per_day.add(ParsedDatetimeFactory("Jul 2   (22:50)"))
 
         self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Timedelta(hours=45, minutes=40)))
 
     def test_how_to_treat_extra_number(self):
         # like extra 24 hours?
         aggregated_time_per_day = AggregatedTimeIntoDays()
-        aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, 1, 23, 50))
+        aggregated_time_per_day.add(ParsedDatetimeFactory("Jul 2   (1+23:50)"))
         self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Timedelta(hours=47, minutes=50)))
 
     def test_hashable_date(self):
