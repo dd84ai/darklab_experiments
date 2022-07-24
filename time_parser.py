@@ -42,8 +42,6 @@ class Timedelta:
         self._data += other._data
         return self
 
-    def __eq__(self, other):
-        return (self.hours, self.minutes) == (other.hours, other.minutes)
 @dataclass(frozen=True)
 class TimedeltaAtDate:
     date: Date
@@ -106,6 +104,9 @@ if __name__=="__main__":
 # =====================+TESTING+=======================
 
 class TestParser(unittest.TestCase):
+
+    def setUp(self) -> None:
+        Timedelta.__eq__ = lambda self, other: (self.hours, self.minutes) == (other.hours, other.minutes)
 
     def test_file_reading(self):
         self.assertTrue(len(list([line for line in line_reader()])) > 0)
