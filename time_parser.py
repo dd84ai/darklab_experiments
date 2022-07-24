@@ -47,10 +47,10 @@ class Timedelta:
 @dataclass(frozen=True)
 class TimedeltaAtDate:
     date: Date
-    time: Timedelta
+    timedelta: Timedelta
 
     def __repr__(self):
-        return f"TimedeltaAtDate({repr(self.date)}, {repr(self.time)})"
+        return f"TimedeltaAtDate({repr(self.date)}, {repr(self.timedelta)})"
 
 class TimedeltaAtDateFactory:
     def __new__(cls, line) -> TimedeltaAtDate:
@@ -66,7 +66,7 @@ class TimedeltaAtDateFactory:
             date=Date(
                 date=result.group(1),
             ),
-            time=Timedelta(
+            timedelta=Timedelta(
                 hours=int(result.group(4)),
                 minutes=int(result.group(5)),
                 extra_hours=int(result.group(3)) if result.group(3) is not None else None,
@@ -75,26 +75,24 @@ class TimedeltaAtDateFactory:
 
 class AggregatedTimeIntoDays:
     def __init__(self):
-        self._storage = {}
+        self._summed_timedelta = {}
 
-    def add(self, parsed_datetime: TimedeltaAtDate):
-        key = parsed_datetime.date
+    def __add__(self, other: TimedeltaAtDate):
+        key = other.date
         self._init_in_storage_if_not_exists(key)
-
-        self._storage[key] = self._sum_new_and_previous_time(
-            previous_time = self._storage[key],
-            newtime = parsed_datetime.time,
-        )
+        timedelta_addition: Timedelta = other.timedelta
+        self._summed_timedelta[key] += timedelta_addition
+        return self
     
     def _init_in_storage_if_not_exists(self, key):
-        if key not in self._storage:
-            self._storage[key] = Timedelta(hours=0, minutes=0)
+        if key not in self._summed_timedelta:
+            self._summed_timedelta[key] = Timedelta(hours=0, minutes=0)
 
     def _sum_new_and_previous_time(self, previous_time: Timedelta, newtime: Timedelta):
         return previous_time + newtime
 
     def __iter__(self) -> Iterator[Tuple[datetime.date, datetime.timedelta]]:
-        for date, time in self._storage.items():
+        for date, time in self._summed_timedelta.items():
             yield date, time
 
 class ActionAgregate:
@@ -104,7 +102,7 @@ class ActionAgregate:
     def run(self):
         for line in line_reader():
             parsed_datetime = TimedeltaAtDateFactory(line)
-            self._aggregated_time_per_day.add(parsed_datetime)
+            self._aggregated_time_per_day += parsed_datetime
         return self
 
     @property
@@ -135,15 +133,15 @@ class TestParser(unittest.TestCase):
 
     def test_aggregator(self):
         aggregated_time_per_day = AggregatedTimeIntoDays()
-        aggregated_time_per_day.add(TimedeltaAtDateFactory("Jul 2   (22:50)"))
-        aggregated_time_per_day.add(TimedeltaAtDateFactory("Jul 2   (22:50)"))
+        aggregated_time_per_day += TimedeltaAtDateFactory("Jul 2   (22:50)")
+        aggregated_time_per_day += TimedeltaAtDateFactory("Jul 2   (22:50)")
 
         self.assertEqual(next(iter(aggregated_time_per_day)), (Date(date='Jul 2'), Timedelta(hours=45, minutes=40)))
 
     def test_how_to_treat_extra_number(self):
         # like extra 24 hours?
         aggregated_time_per_day = AggregatedTimeIntoDays()
-        aggregated_time_per_day.add(TimedeltaAtDateFactory("Jul 2   (1+23:50)"))
+        aggregated_time_per_day += TimedeltaAtDateFactory("Jul 2   (1+23:50)")
         self.assertEqual(next(iter(aggregated_time_per_day)), (Date(date='Jul 2'), Timedelta(hours=47, minutes=50)))
 
     def test_hashable_date_appears_once_in_storage(self):
