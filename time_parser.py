@@ -38,9 +38,6 @@ class Timedelta:
         self._data += other._data
         return self
 
-    def __eq__(self, other):
-        return (self.hours, self.minutes) == (other.hours, other.minutes)
-
     def __repr__(self):
         return f"Timedelta(hours={self.hours}, minutes={self.minutes}"
     
@@ -116,11 +113,11 @@ class TestParser(unittest.TestCase):
     
     def test_parse_line(self):
         parsed = TimedeltaAtDateFactory("Jul 2   (04:17)")
-        self.assertEqual(repr(parsed), "TimedeltaAtDate(Date(date='Jul 2'), Timedelta(hours=4, minutes=17)") 
+        self.assertEqual(parsed, TimedeltaAtDate(Date(date='Jul 2'), Timedelta(hours=4, minutes=17)))
 
     def test_parse_tricky_line(self):
         parsed = TimedeltaAtDateFactory("Jul 2   (1+12:44)")
-        self.assertEqual(repr(parsed), "TimedeltaAtDate(Date(date='Jul 2'), Timedelta(hours=36, minutes=44)") 
+        self.assertEqual(parsed, TimedeltaAtDate(Date(date='Jul 2'), Timedelta(hours=36, minutes=44)))
 
     def test_aggregator(self):
         aggregated_time_per_day = AggregatedTimeIntoDays()
