@@ -80,16 +80,13 @@ class AggregatedTimeIntoDays:
     def __add__(self, other: TimedeltaAtDate):
         key = other.date
         self._init_in_storage_if_not_exists(key)
-        timedelta_addition: Timedelta = other.timedelta
-        self._summed_timedelta[key] += timedelta_addition
+        self._summed_timedelta[key] += other.timedelta
         return self
     
     def _init_in_storage_if_not_exists(self, key):
         if key not in self._summed_timedelta:
             self._summed_timedelta[key] = Timedelta(hours=0, minutes=0)
 
-    def _sum_new_and_previous_time(self, previous_time: Timedelta, newtime: Timedelta):
-        return previous_time + newtime
 
     def __iter__(self) -> Iterator[Tuple[datetime.date, datetime.timedelta]]:
         for date, time in self._summed_timedelta.items():
