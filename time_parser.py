@@ -3,6 +3,7 @@ import re
 from typing import Tuple, Iterator
 from dataclasses import dataclass
 import datetime
+from collections import defaultdict
 
 def line_reader():
     with open('time_parser_input_example.txt', 'r') as input_:
@@ -15,7 +16,7 @@ class Date:
 
 class Timedelta:
     _data: datetime.timedelta
-    def __init__(self, hours, minutes, extra_hours = None):
+    def __init__(self, hours = 0, minutes = 0, extra_hours = None):
         hours = hours
         if extra_hours:
             hours += 24
@@ -75,18 +76,11 @@ class TimedeltaAtDateFactory:
 
 class AggregatedTimeIntoDays:
     def __init__(self):
-        self._summed_timedelta = {}
+        self._summed_timedelta = defaultdict(Timedelta)
 
     def __add__(self, other: TimedeltaAtDate):
-        key = other.date
-        self._init_in_storage_if_not_exists(key)
-        self._summed_timedelta[key] += other.timedelta
+        self._summed_timedelta[other.date] += other.timedelta
         return self
-    
-    def _init_in_storage_if_not_exists(self, key):
-        if key not in self._summed_timedelta:
-            self._summed_timedelta[key] = Timedelta(hours=0, minutes=0)
-
 
     def __iter__(self) -> Iterator[Tuple[datetime.date, datetime.timedelta]]:
         for date, time in self._summed_timedelta.items():
