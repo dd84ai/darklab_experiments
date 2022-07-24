@@ -16,7 +16,7 @@ class Date:
 
 class Timedelta:
     _data: datetime.timedelta
-    def __init__(self, hours = 0, minutes = 0, extra_hours = None):
+    def __init__(self, hours, minutes, extra_hours = None):
         hours = hours
         if extra_hours:
             hours += 24
@@ -25,6 +25,10 @@ class Timedelta:
             hours=hours,
             minutes=minutes,
         )
+    
+    @classmethod
+    def get_null(cls):
+        return cls(hours=0, minutes=0)
 
     @property
     def hours(self):
@@ -68,7 +72,7 @@ class TimedeltaAtDateFactory:
 
 class AggregatedTimeIntoDays:
     def __init__(self):
-        self._summed_timedelta = defaultdict(Timedelta)
+        self._summed_timedelta = defaultdict(Timedelta.get_null)
 
     def __add__(self, other: TimedeltaAtDate):
         self._summed_timedelta[other.date] += other.timedelta
