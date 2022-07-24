@@ -2,24 +2,60 @@ import unittest
 import re
 from typing import Tuple, Iterator
 from dataclasses import dataclass
+import datetime
 
 def line_reader():
     with open('time_parser_input_example.txt', 'r') as input_:
         for line in input_:
             yield line
 
-@dataclass(frozen=True)
 class Date:
-    month: int
-    day: int
 
+    def __init__(self, month, day):
+        self._month = month
+        self._day = day
 
-@dataclass(frozen=True)
+    @property
+    def month(self):
+        return self._month
+
+    @property
+    def day(self):
+        return self._day
+    
+    def __hash__(self):
+        return hash((self.month, self.day))
+
+    def __eq__(self, other):
+        return (self.month, self.day) == (other.month, other.day)
+
 class Time:
-    hours: int
-    minutes: int
-    extra_number: int | None = None
+    _data: datetime.timedelta
+    def __init__(self, hours, minutes, extra_hours = None):
+        hours = hours
+        if extra_hours:
+            hours += 24
 
+        self._data =  datetime.timedelta(
+            hours=hours,
+            minutes=minutes,
+        )
+
+    @property
+    def hours(self):
+        return int(self._data.total_seconds() / 3600)
+
+    @property
+    def minutes(self):
+        return int(self._data.total_seconds() / 60) - self.hours * 60
+
+    def __add__(self, other):
+        self._data += other._data
+        return self
+
+    def __eq__(self, other):
+        return (self.hours, self.minutes) == (other.hours, other.minutes)
+    
 
 @dataclass(frozen=True)
 class ParsedDatetime:
@@ -29,15 +65,23 @@ class ParsedDatetime:
 class ParsedDatetimeFactory:
     def __new__(cls, *args, **kwargs: dict) -> ParsedDatetime:
         is_source_dict = True if len(args) == 0 else False
+
+        month=kwargs["month"] if is_source_dict else args[0]
+        day=kwargs["day"] if is_source_dict else args[1]
+
+        extra_hours = kwargs["extra_number"] if is_source_dict else args[2]
+        hours = kwargs["hours"] if is_source_dict else args[3]
+        
+        minutes = kwargs["minutes"] if is_source_dict else args[4]
         return ParsedDatetime(
-            Date(
-                month=kwargs["month"] if is_source_dict else args[0],
-                day=kwargs["day"] if is_source_dict else args[1],
+            date=Date(
+                month=month,
+                day=day,
             ),
-            Time(
-                extra_number=kwargs["extra_number"] if is_source_dict else args[2],
-                hours=kwargs["hours"] if is_source_dict else args[3],
-                minutes=kwargs["minutes"] if is_source_dict else args[4],
+            time=Time(
+                hours=hours,
+                minutes=minutes,
+                extra_hours=extra_hours,
             ),
         )
 
@@ -60,6 +104,7 @@ class ParsedDatetimeFactory:
             minutes=int(result.group(6))
         )
 
+import datetime
 
 class AggregatedTimeIntoDays:
     def __init__(self):
@@ -79,15 +124,9 @@ class AggregatedTimeIntoDays:
             self._storage[key] = Time(hours=0, minutes=0)
 
     def _sum_new_and_previous_time(self, previous_time: Time, newtime: Time):
-        bonus_time = 24 if newtime.extra_number is not None else 0
-        summed_hours = previous_time.hours + newtime.hours + bonus_time
-        summed_minutes = previous_time.minutes + newtime.minutes
-        return Time(
-            hours = summed_hours + int(summed_minutes / 60),
-            minutes= summed_minutes % 60,
-        )
+        return previous_time + newtime
 
-    def __iter__(self) -> Iterator[Tuple[Date, Time]]:
+    def __iter__(self) -> Iterator[Tuple[datetime.date, datetime.timedelta]]:
         for date, time in self._storage.items():
             yield date, time
 
@@ -139,4 +178,12 @@ class TestParser(unittest.TestCase):
         aggregated_time_per_day = AggregatedTimeIntoDays()
         aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, 1, 23, 50))
         self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Time(hours=47, minutes=50)))
+
+    def test_hashable_date(self):
+        storage = {}
+
+        storage[Date(0, 0)] = 1
+        storage[Date(0, 0)] = 2
+
+        self.assertEqual(len(storage.keys()), 1)
 
