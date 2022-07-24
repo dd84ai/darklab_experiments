@@ -9,27 +9,12 @@ def line_reader():
         for line in input_:
             yield line
 
+@dataclass(frozen=True)
 class Date:
+    month: int
+    day: int
 
-    def __init__(self, month, day):
-        self._month = month
-        self._day = day
-
-    @property
-    def month(self):
-        return self._month
-
-    @property
-    def day(self):
-        return self._day
-    
-    def __hash__(self):
-        return hash((self.month, self.day))
-
-    def __eq__(self, other):
-        return (self.month, self.day) == (other.month, other.day)
-
-class Time:
+class Timedelta:
     _data: datetime.timedelta
     def __init__(self, hours, minutes, extra_hours = None):
         hours = hours
@@ -60,7 +45,7 @@ class Time:
 @dataclass(frozen=True)
 class ParsedDatetime:
     date: Date
-    time: Time
+    time: Timedelta
 
 class ParsedDatetimeFactory:
     def __new__(cls, *args, **kwargs: dict) -> ParsedDatetime:
@@ -78,7 +63,7 @@ class ParsedDatetimeFactory:
                 month=month,
                 day=day,
             ),
-            time=Time(
+            time=Timedelta(
                 hours=hours,
                 minutes=minutes,
                 extra_hours=extra_hours,
@@ -121,9 +106,9 @@ class AggregatedTimeIntoDays:
     
     def _init_in_storage_if_not_exists(self, key):
         if key not in self._storage:
-            self._storage[key] = Time(hours=0, minutes=0)
+            self._storage[key] = Timedelta(hours=0, minutes=0)
 
-    def _sum_new_and_previous_time(self, previous_time: Time, newtime: Time):
+    def _sum_new_and_previous_time(self, previous_time: Timedelta, newtime: Timedelta):
         return previous_time + newtime
 
     def __iter__(self) -> Iterator[Tuple[datetime.date, datetime.timedelta]]:
@@ -171,13 +156,13 @@ class TestParser(unittest.TestCase):
         aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, None, 22, 50))
         aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, None, 22, 50))
 
-        self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Time(hours=45, minutes=40)))
+        self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Timedelta(hours=45, minutes=40)))
 
     def test_how_to_treat_extra_number(self):
         # like extra 24 hours?
         aggregated_time_per_day = AggregatedTimeIntoDays()
         aggregated_time_per_day.add(ParsedDatetimeFactory("Jul", 2, 1, 23, 50))
-        self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Time(hours=47, minutes=50)))
+        self.assertEqual(next(iter(aggregated_time_per_day)), (Date(month='Jul', day=2), Timedelta(hours=47, minutes=50)))
 
     def test_hashable_date(self):
         storage = {}
